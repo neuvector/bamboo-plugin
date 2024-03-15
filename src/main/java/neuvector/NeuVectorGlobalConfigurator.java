@@ -4,8 +4,8 @@ import com.atlassian.bamboo.configuration.AdministrationConfiguration;
 import com.atlassian.bamboo.configuration.AdministrationConfigurationPersister;
 import com.atlassian.bamboo.configuration.GlobalAdminAction;
 import com.atlassian.spring.container.ContainerManager;
-import java.net.URL;
-import org.apache.commons.lang.StringUtils;
+
+import java.net.InetAddress;
 
 public class NeuVectorGlobalConfigurator extends GlobalAdminAction {
     private String controllerIP;
@@ -15,6 +15,10 @@ public class NeuVectorGlobalConfigurator extends GlobalAdminAction {
     private String registryURL;
     private String registryUsername;
     private String registryPassword;
+    private String scannerRegistryURL;
+    private String scannerImageRepository;
+    private String scannerRegistryUsername;
+    private String scannerRegistryPassword;
 
     public String execute() throws Exception {
         final AdministrationConfiguration adminConfig = (AdministrationConfiguration) ContainerManager.getComponent("administrationConfiguration");
@@ -25,17 +29,14 @@ public class NeuVectorGlobalConfigurator extends GlobalAdminAction {
         this.registryURL = adminConfig.getSystemProperty("registryURL");
         this.registryUsername = adminConfig.getSystemProperty("registryUsername");
         this.registryPassword = adminConfig.getSystemProperty("registryPassword");
+        this.scannerRegistryURL = adminConfig.getSystemProperty("scannerRegistryURL");
+        this.scannerImageRepository = adminConfig.getSystemProperty("scannerImageRepository");
+        this.scannerRegistryUsername = adminConfig.getSystemProperty("scannerRegistryUsername");
+        this.scannerRegistryPassword = adminConfig.getSystemProperty("scannerRegistryPassword");
         return "input";
     }
 
     public String save() {
-        final boolean isValidIP = checkControllerIP(this.controllerIP);
-        final boolean isValidPort = checkControllerPort(this.controllerPort);
-        final boolean isValidUsername = checkUser(this.nvUsername);
-        final boolean isValidPassword = checkPassword(this.nvPassword);
-        if (!isValidIP || !isValidPort || !isValidUsername || !isValidPassword) {
-            return "error";
-        }
         final AdministrationConfiguration adminConfig = (AdministrationConfiguration) ContainerManager.getComponent("administrationConfiguration");
         adminConfig.setSystemProperty("controllerIP", this.controllerIP);
         adminConfig.setSystemProperty("controllerPort", this.controllerPort);
@@ -44,20 +45,27 @@ public class NeuVectorGlobalConfigurator extends GlobalAdminAction {
         adminConfig.setSystemProperty("registryURL", this.registryURL);
         adminConfig.setSystemProperty("registryUsername", this.registryUsername);
         adminConfig.setSystemProperty("registryPassword", this.registryPassword);
+        adminConfig.setSystemProperty("scannerRegistryURL", this.scannerRegistryURL);
+        adminConfig.setSystemProperty("scannerImageRepository", this.scannerImageRepository);
+        adminConfig.setSystemProperty("scannerRegistryUsername", this.scannerRegistryUsername);
+        adminConfig.setSystemProperty("scannerRegistryPassword", this.scannerRegistryPassword);
+
         ((AdministrationConfigurationPersister) ContainerManager.getComponent("administrationConfigurationPersister")).saveAdministrationConfiguration(adminConfig);
         this.addActionMessage("NeuVector Global Configuration Successfully Saved");
         return "success";
     }
 
-    private boolean checkControllerIP(final String value) {
-        if (value == null || value.trim().isEmpty() || value.trim().matches("^(http|https)://.*$")) {
+    public boolean checkControllerIP(final String ip) {
+        try {
+            InetAddress address = InetAddress.getByName(ip);
+        } catch (Exception e) {
             this.addActionError("Please enter a valid IP without http:// or https:// for Controller IP");
             return false;
         }
         return true;
     }
 
-    private boolean checkControllerPort(final String value) {
+    public boolean checkControllerPort(final String value) {
         try {
             if (value == null || Integer.parseInt(value.trim()) < 0) {
                 this.addActionError("Please enter a number for Controller Port");
@@ -68,22 +76,6 @@ public class NeuVectorGlobalConfigurator extends GlobalAdminAction {
             this.addActionError("Please enter a number for Controller Port");
             return false;
         }
-    }
-
-    private boolean checkUser(final String value) {
-        if (value == null || value.trim().isEmpty()) {
-            this.addActionError("Please enter a valid NeuVector Username");
-            return false;
-        }
-        return true;
-    }
-
-    private boolean checkPassword(final String value) {
-        if (value == null || value.trim().isEmpty()) {
-            this.addActionError("Please enter a valid NeuVector Password");
-            return false;
-        }
-        return true;
     }
 
     public String getControllerIP() {
@@ -141,4 +133,36 @@ public class NeuVectorGlobalConfigurator extends GlobalAdminAction {
     public void setRegistryPassword(String registryPassword) {
         this.registryPassword = registryPassword;
     }
+
+    public String getScannerRegistryURL() {
+        return this.scannerRegistryURL;
+    }
+
+    public void setScannerRegistryURL(String scannerRegistryURL) {
+        this.scannerRegistryURL = scannerRegistryURL;
+    }
+
+    public String getScannerImageRepository() {
+        return this.scannerImageRepository;
+    }
+
+    public void setScannerImageRepository(String scannerImageRepository) {
+        this.scannerImageRepository = scannerImageRepository;
+    }
+
+    public String getScannerRegistryUsername() {
+        return this.scannerRegistryUsername;
+    }
+
+    public void setScannerRegistryUsername(String scannerRegistryUsername) {
+        this.scannerRegistryUsername = scannerRegistryUsername;
+    }
+
+    public String getScannerRegistryPassword() {
+        return this.scannerRegistryPassword;
+    }
+
+    public void setScannerRegistryPassword(String scannerRegistryPassword) {
+        this.scannerRegistryPassword = scannerRegistryPassword;
+    } 
 }
