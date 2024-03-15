@@ -64,12 +64,10 @@
     var vulnerabilitiesToExempt = JSON.parse('${vulnerabilitiesToExemptJson}');
 
     vulnerabilitiesToFail.forEach(function(vuln) {
-        console.log('vulnerabilitiesToFail:', vuln);
         addTextField('dynamicFieldsToFail', 'failVul', vuln);
     });
 
     vulnerabilitiesToExempt.forEach(function(vuln) {
-        console.log('vulnerabilitiesToExempt:', vuln);
         addTextField('dynamicFieldsToExempt', 'exemptVul', vuln);
     });
 
