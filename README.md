@@ -41,7 +41,7 @@
 
 
 4. Create artifact in task, must create or you have no such report
-<img width="1319" alt="Screen Shot 2024-03-15 at 5 15 27 PM" src="https://github.com/pohanhuangtw/bamboo-plugin/assets/145627854/95d52e4b-c0b6-484a-ba16-5c31a8af36f2">
+<img width="1944" alt="Screen Shot 2024-03-20 at 12 03 59 PM" src="https://github.com/pohanhuangtw/bamboo-plugin/assets/145627854/8ac4316a-482d-468f-9633-6824ce8cd638">
 
 
 
@@ -51,7 +51,9 @@
 - When finish, we will have two files (you can click to download)
     - Html
     - Json
-<img width="1097" alt="Screen Shot 2024-03-15 at 5 10 49 PM" src="https://github.com/pohanhuangtw/bamboo-plugin/assets/145627854/0654b838-113a-47bb-a078-bea928519720">
+    - Txt
+  <img width="1018" alt="Screen Shot 2024-03-20 at 12 03 44 PM" src="https://github.com/pohanhuangtw/bamboo-plugin/assets/145627854/cc73964f-78d8-49ba-86dc-872db66984f8">
+
 
 
 # Trouble shooting
