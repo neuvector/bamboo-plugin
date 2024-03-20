@@ -1,0 +1,47 @@
+<atlassian-plugin key="${atlassian.plugin.key}" name="${project.name}" plugins-version="2">
+    <plugin-info>
+        <description>${project.description}</description>
+        <version>${project.version}</version>
+        <vendor name="${project.organization.name}" url="${project.organization.url}" />
+        <param name="plugin-icon">images/neuvector.png</param>
+        <param name="plugin-logo">images/neuvector.png</param>
+    </plugin-info>
+
+    <!-- add our i18n resource -->
+    <resource type="i18n" name="i18n" location="neuvector"/>
+
+    <!-- add our web resources -->
+    <web-resource key="neuvector-resources" name="NeuVector Web Resources">
+        <dependency>com.atlassian.auiplugin:ajs</dependency>
+
+        <resource type="download" name="myfirstplugin.css" location="/css/neuvector.css"/>
+        <resource type="download" name="myfirstplugin.js" location="/js/neuvector.js"/>
+        <resource type="download" name="images/" location="/images"/>
+
+        <context>neuvector</context>
+    </web-resource>
+
+    <xwork key="neuvectorGlobalConfiguration" name="NeuVector Global Configuration Page">
+        <package name="neuvectorGCPackage" extends="admin">
+            <action name="neuvectorGlobalConfiguration" class="neuvector.NeuVectorGlobalConfigurator">
+                <result name="input" type="freemarker">/templates/neuvectorGlobalConfiguration.ftl</result>
+                <result name="success" type="freemarker">/templates/neuvectorGlobalConfiguration.ftl</result>
+                <result name="error" type="freemarker">/templates/neuvectorGlobalConfiguration.ftl</result>
+            </action>
+        </package>
+    </xwork>
+
+    <web-item key="neuvectorGlobalConfig" name="NeuVector Global Configuration" section="system.admin/plugins" weight="100">
+        <description>NeuVector Global Configuration</description>
+        <label key="NeuVector" />
+        <link>/admin/neuvectorGlobalConfiguration.action</link>
+    </web-item>
+
+    <taskType key="neuvectorScannerTask" name="NeuVector Scanner Task" class="neuvector.NeuVectorScannerTask">
+        <description>A task that scanns image vulnerabilities</description>
+        <configuration class="neuvector.NeuVectorTaskConfigurator"/>
+        <resource type="freemarker" name="edit" location="templates/neuvectorScannerTask.ftl"/>
+        <resource type="freemarker" name="view" location="templates/neuvectorScannerTask.ftl"/>
+        <resource type="download" name="icon" location="/images/neuvector.png"/>
+    </taskType>
+</atlassian-plugin>
