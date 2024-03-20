@@ -21,6 +21,7 @@ import java.io.File;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.LinkedHashMap;
+import java.util.stream.Collectors;
 
 import neuvector.report.*;
 import neuvector.scanner.*;
@@ -123,6 +124,7 @@ public class NeuVectorScannerTask implements TaskType {
                     vulnerability.setScore(Float.valueOf(vulnerabilityObject.get("score").getAsString()));
                     vulnerability.setPackage_name(vulnerabilityObject.get("package_name").getAsString());
                     vulnerability.setPackage_version(vulnerabilityObject.get("package_version").getAsString());
+                    vulnerability.setFile_name(vulnerabilityObject.get("file_name").getAsString());
                     vulnerability.setFixed_version(vulnerabilityObject.get("fixed_version").getAsString());
                     vulnerability.setVectors(vulnerabilityObject.get("vectors").getAsString());
                     vulnerability.setDescription(vulnerabilityObject.get("description").getAsString());
@@ -159,6 +161,7 @@ public class NeuVectorScannerTask implements TaskType {
 
         if (scanConfig.isScanLayers()) {
             if (reportJson.has("layers")) {
+                scanResult.setScanLayerSupported(true);
                 JsonArray layerArray = reportJson.getAsJsonArray("layers");
                 LinkedHashMap<String, Set<Vulnerability>> layeredVulnerabilityMap = new LinkedHashMap<String, Set<Vulnerability>>();
                 for (int i = 0; i < layerArray.size(); i++) {
@@ -181,6 +184,7 @@ public class NeuVectorScannerTask implements TaskType {
                             vulnerability.setScore(Float.valueOf(layerVulnerabilityObject.get("score").getAsString()));
                             vulnerability.setPackage_name(layerVulnerabilityObject.get("package_name").getAsString());
                             vulnerability.setPackage_version(layerVulnerabilityObject.get("package_version").getAsString());
+                            vulnerability.setFile_name(layerVulnerabilityObject.get("file_name").getAsString());
                             vulnerability.setFixed_version(layerVulnerabilityObject.get("fixed_version").getAsString());
                             vulnerability.setLink(layerVulnerabilityObject.get("link").getAsString());
                             vulnerability.setFeed_rating(layerVulnerabilityObject.get("feed_rating").getAsString());
@@ -242,8 +246,9 @@ public class NeuVectorScannerTask implements TaskType {
     }
 
     private void writeReport(final TaskContext taskContext, ProcessResult processResult) throws IOException, InterruptedException {
-        writeHTMLReport(taskContext, processResult);
         writeJsonReport(taskContext, processResult);
+        writeTxtReport(taskContext, processResult);
+        writeHTMLReport(taskContext, processResult);
     }
 
     public void writeJsonReport(final TaskContext taskContext, ProcessResult processResult) throws IOException {
@@ -258,118 +263,234 @@ public class NeuVectorScannerTask implements TaskType {
         }
     }
 
+    public void writeTxtReport(final TaskContext taskContext, ProcessResult processResult) throws IOException {
+        ScanResult scanResult = processResult.getScanResult();
+        File reportFile = new File(taskContext.getWorkingDirectory(), "neuvector-report.txt");
+
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(reportFile))) {
+            // Report header
+            writer.write("************************ Scan Report ************************\n");
+            if (!scanResult.isLocalScan()) {
+                writer.write("Registry URL: " + scanResult.getRegistry() + "\n");
+            }
+            writer.write("Repository: " + scanResult.getRepository() + "\n");
+            writer.write("Tag: " + scanResult.getTag() + "\n");
+            writer.write("High severity vulnerabilities: " + scanResult.getHighSeverityNumber() + "\n");
+            writer.write("Medium severity vulnerabilities: " + scanResult.getMediumSeverityNumber() + "\n");
+            writer.write("Total vulnerabilities: " + scanResult.getTotalVulnerabilityNumber() + "\n");
+            writer.write("********************** Vulnerabilities **********************\n\n");
+
+            // Handling if no vulnerabilities are found
+            if (scanResult.getTotalVulnerabilityNumber() == 0) {
+                writer.write("Scanned. No vulnerabilities found.\n");
+            } else {
+                // Detailed vulnerabilities
+                for (Vulnerability vulnerability : scanResult.getHighVulnerabilitySet()) {
+                    writeTxtReportVulnerabilityDetails(writer, vulnerability, "High");
+                }
+                for (Vulnerability vulnerability : scanResult.getMediumVulnerabilitySet()) {
+                    writeTxtReportVulnerabilityDetails(writer, vulnerability, "Medium");
+                }
+            }
+
+            // Layer Vulnerability History
+            if(scanResult.isScanLayerSupported()) {
+                writer.write("\n**************** Layer Vulnerability History ****************\n");
+                Set<String> keys = scanResult.getLayeredVulsMap().keySet();
+                for(String key : keys){
+                    Set<Vulnerability> vulSet = scanResult.getLayeredVulsMap().get(key);
+                    writer.write("Layer digest " + key + " contains " + vulSet.size() + " vulnerabilities.\n");
+                    for(Vulnerability vulnerability: vulSet){
+                        writeTxtReportVulnerabilityDetails(writer, vulnerability, vulnerability.getSeverity()); // Assuming getSeverity() method exists
+                    }
+                }
+            } else if (scanResult.isScanLayerConfigured()) {
+                writer.write("\n*** Your Controller Does Not Support Layer Vulnerability Scan ***\n");
+            }
+
+            // Exempted Vulnerabilities
+            if(scanResult.isWhiteListVulExisted()) {
+                writer.write("\n********************** Exempt Vulnerability **********************\n");
+                for(String exemptedVul : scanResult.getExistedWhiteListVulSet()){
+                    writer.write("The vulnerability " + exemptedVul.toUpperCase() + " is exempt.\n");
+                }
+            }
+
+        } catch (IOException e) {
+            System.err.println("IOException: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    // Helper method to write vulnerability details
+    private void writeTxtReportVulnerabilityDetails(BufferedWriter writer, Vulnerability vulnerability, String severity) throws IOException {
+        writer.write("Name: " + vulnerability.getName().toUpperCase() + "\n");
+        writer.write("Severity: " + severity + "\n");
+        writer.write("Score: " + vulnerability.getScore() + "\n");
+        writer.write("Package: " + vulnerability.getPackage_name() + ":" + vulnerability.getPackage_version() + "\n");
+        writer.write("Filename: " + vulnerability.getFile_name() + "\n");
+        writer.write("Fixed version: " + vulnerability.getFixed_version() + "\n");
+        writer.write("Vectors: " + vulnerability.getVectors() + "\n");
+        writer.write("Description: " + vulnerability.getDescription() + "\n");
+        writer.write("Link: " + vulnerability.getLink() + "\n\n");
+    }
+
     public void writeHTMLReport(final TaskContext taskContext, ProcessResult processResult) throws IOException {
         ScanResult scanResult = processResult.getScanResult();
         File reportFile = new File(taskContext.getWorkingDirectory(), "neuvector-report.html");
-
-        // Basic CSS styles. Replace with your actual CSS if needed.
+    
+        StringBuilder htmlContent = new StringBuilder();
+    
+        // Basic CSS styles
         String cssStyles = "<style>" +
             "body { font-family: Arial, sans-serif; }" +
             "table { border-collapse: collapse; width: 100%; }" +
             "th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }" +
             "th { background-color: #f2f2f2; }" +
             "</style>";
-
-        // The HTML content should be well-formed. Close all opened tags.
-        String htmlContent = "<!DOCTYPE html>\n" +
-            "<html lang=\"en\">\n" +
-            "<head>\n" +
-            "<meta charset=\"UTF-8\">\n" +
-            "<title>NeuVector Scan Report</title>\n" +
-            cssStyles + // Include the CSS styles.
-            "</head>\n" +
-            "<body>\n" +
-            "<h1>Scan Report</h1>\n" +
-            "<h3>Summary</h3>\n" +
-            "<table>\n" +
-            "<tr>\n" +
-            "<th>Registry URL</th>\n" +
-            "<th>Repository</th>\n" +
-            "<th>Tag</th>\n" +
-            "<th>High severity VULs</th>\n" +
-            "<th>High severity threshold</th>\n" +
-            "<th>Medium severity VULs</th>\n" +
-            "<th>Medium severity threshold</th>\n" +
-            "<th>VULs to fail the build</th>\n" +
-            "<th>Total VULs</th>\n" +
-            "</tr>\n" +
-            "<tr>\n" +
-            "<td>" + escapeHtml(scanResult.getRegistry()) + "</td>\n" +
-            "<td>" + escapeHtml(scanResult.getRepository()) + "</td>\n" +
-            "<td>" + escapeHtml(scanResult.getTag()) + "</td>\n" +
-            "<td>" + scanResult.getHighVulnerabilitySet().size() + "</td>\n" +
-            "<td>" + (scanResult.getHighSeverityThreshold() != 0 ? scanResult.getHighSeverityThreshold() : "No Limit") + "</td>\n" +
-            "<td>" + scanResult.getMediumVulnerabilitySet().size() + "</td>\n" +
-            "<td>" + (scanResult.getMediumSeverityThreshold() != 0 ? scanResult.getMediumSeverityThreshold() : "No Limit") + "</td>\n" +
-            "<td>" + escapeHtml(String.join(", ", scanResult.getExistedBlackListVulSet())) + "</td>\n" +
-            "<td>" + scanResult.getTotalVulnerabilityNumber() + "</td>\n" +
-            "</tr>\n" +
-            "</table>\n" +
-            "<h3>Vulnerabilities</h3>\n";
-
-        // If no vulnerabilities found, display a message
-        if (scanResult.getTotalVulnerabilityNumber() == 0) {
-            htmlContent += "<p>Scanned. No vulnerabilities found.</p>\n";
-        } else {
-            htmlContent += "<table>\n" +
-                "<tr>\n" +
-                "<th>Name</th>\n" +
-                "<th>Severity</th>\n" +
-                "<th>Score</th>\n" +
-                "<th>Package</th>\n" +
-                "<th>Fixed_version</th>\n" +
-                "<th>Vectors</th>\n" +
-                "<th>Description</th>\n" +
-                "<th>Feed_rating</th>\n" +
-                "</tr>\n";
-
-            // Add rows for high vulnerabilities
+    
+        // Start building the HTML content
+        htmlContent.append("<!DOCTYPE html>\n")
+            .append("<html lang=\"en\">\n")
+            .append("<head>\n")
+            .append("<meta charset=\"UTF-8\">\n")
+            .append("<title>NeuVector Scan Report</title>\n")
+            .append(cssStyles)
+            .append("</head>\n")
+            .append("<body>\n")
+            .append("<h1>Scan Report</h1>\n")
+            .append("<h3>Summary</h3>\n")
+            .append("<table>\n")
+            .append("<tr>\n")
+            .append("<th>Registry URL</th>\n")
+            .append("<th>Repository</th>\n")
+            .append("<th>Tag</th>\n")
+            .append("<th>High severity VULs</th>\n")
+            .append("<th>High severity threshold</th>\n")
+            .append("<th>Medium severity VULs</th>\n")
+            .append("<th>Medium severity threshold</th>\n")
+            .append("<th>VULs to fail the build</th>\n")
+            .append("<th>Total VULs</th>\n")
+            .append("</tr>\n")
+            .append("<tr>\n")
+            .append("<td>").append(escapeHtml(scanResult.getRegistry())).append("</td>\n")
+            .append("<td>").append(escapeHtml(scanResult.getRepository())).append("</td>\n")
+            .append("<td>").append(escapeHtml(scanResult.getTag())).append("</td>\n")
+            .append("<td>").append(Integer.toString(scanResult.getHighVulnerabilitySet().size())).append("</td>\n")
+            .append("<td>").append(scanResult.getHighSeverityThreshold() != 0 ? Integer.toString(scanResult.getHighSeverityThreshold()) : "No Limit").append("</td>\n")
+            .append("<td>").append(Integer.toString(scanResult.getMediumVulnerabilitySet().size())).append("</td>\n")
+            .append("<td>").append(scanResult.getMediumSeverityThreshold() != 0 ? Integer.toString(scanResult.getMediumSeverityThreshold()) : "No Limit").append("</td>\n")
+            .append("<td>").append(escapeHtml(String.join(", ", scanResult.getExistedBlackListVulSet()))).append("</td>\n")
+            .append("<td>").append(Integer.toString(scanResult.getTotalVulnerabilityNumber())).append("</td>\n")
+            .append("</tr>\n")
+            .append("</table>\n");
+    
+        // Append vulnerabilities section
+        if (scanResult.getTotalVulnerabilityNumber() > 0) {
+            htmlContent.append("<h3>Vulnerabilities</h3>\n")
+                .append("<table>\n")
+                .append("<tr>\n")
+                .append("<th>Name</th>\n")
+                .append("<th>Severity</th>\n")
+                .append("<th>Score</th>\n")
+                .append("<th>Package</th>\n")
+                .append("<th>Filename</th>\n")
+                .append("<th>Fixed_version</th>\n")
+                .append("<th>Vectors</th>\n")
+                .append("<th>Description</th>\n")
+                .append("<th>Feed_rating</th>\n")
+                .append("</tr>\n");
+            // High vulnerabilities
             for (Vulnerability vulnerability : scanResult.getHighVulnerabilitySet()) {
-                htmlContent += getVulnerabilityRowHtml(vulnerability, "High");
+                htmlContent.append(getVulnerabilityRowHtml(vulnerability, "High"));
             }
-
-            // Add rows for medium vulnerabilities
+            // Medium vulnerabilities
             for (Vulnerability vulnerability : scanResult.getMediumVulnerabilitySet()) {
-                htmlContent += getVulnerabilityRowHtml(vulnerability, "Medium");
+                htmlContent.append(getVulnerabilityRowHtml(vulnerability, "Medium"));
             }
-
-            htmlContent += "</table>\n";
+            htmlContent.append("</table>\n");
+        } else {
+            htmlContent.append("<p>No vulnerabilities found.</p>\n");
         }
-
-        // Closing tags for HTML document
-        htmlContent += "</body>\n" +
-            "</html>";
-
-        // Writing the file with UTF-8 encoding.
+    
+        if(scanResult.isScanLayerSupported()){
+            htmlContent.append("<h3> Layer Vulnerability History </h3>\n");
+            Set<String> keys = scanResult.getLayeredVulsMap().keySet();
+            for(String key : keys){
+                Set<Vulnerability> vulSet = scanResult.getLayeredVulsMap().get(key);
+                htmlContent.append("<p>Layer digest ").append(key).append(" contains ").append(vulSet.size()).append(" vulnerabilities.</p>\n");
+                if(!vulSet.isEmpty()){
+                    htmlContent.append("<table>\n")
+                        .append("    <tr>\n")
+                        .append("        <th>Name</th>\n")
+                        .append("        <th>Score</th>\n")
+                        .append("        <th>Package</th>\n")
+                        .append("        <th>Filename</th>\n")
+                        .append("        <th>Fixed_version</th>\n")
+                        .append("        <th>Link</th>\n")
+                        .append("        <th>Feed_rating</th>\n")
+                        .append("    </tr>\n");
+    
+                    for (Vulnerability vulnerability : vulSet) {
+                        htmlContent.append("<tr>\n")
+                            .append("<td><a target=\"_parent\" href=\"").append(escapeHtml(vulnerability.getLink())).append("\">").append(escapeHtml(vulnerability.getName())).append("</a></td>\n")
+                            .append("<td>").append(vulnerability.getScore()).append("</td>\n")
+                            .append("<td>").append(escapeHtml(vulnerability.getPackage_name())).append(":").append(escapeHtml(vulnerability.getPackage_version())).append("</td>\n")
+                            .append("<td>").append(escapeHtml(vulnerability.getFile_name())).append("</td>\n")
+                            .append("<td>").append(escapeHtml(vulnerability.getFixed_version())).append("</td>\n")
+                            .append("<td><a href=\"").append(escapeHtml(vulnerability.getLink())).append("\" target=\"_blank\">Link</a></td>\n")
+                            .append("<td>").append(escapeHtml(vulnerability.getFeed_rating())).append("</td>\n")
+                            .append("</tr>\n");
+                    }
+                    htmlContent.append("</table>\n");
+                }
+            }
+        }else{
+            htmlContent.append("<p> Your Controller Does Not Support Layer Vulnerability Scan </p>\n");
+        }
+        
+        // Output the found exempted vulnerabilities
+        if(scanResult.isWhiteListVulExisted()){
+            htmlContent.append("<h3>Exempted Vulnerabilities</h3>\n");
+            if(scanResult.getExistedWhiteListVulSet().size() == 1){
+                htmlContent.append("<p> ").append(escapeHtml(scanResult.getExistedWhiteListVulSet().iterator().next().toUpperCase())).append(" </p>\n");
+            }else{
+                htmlContent.append("<p> ").append(String.join(", ", scanResult.getExistedWhiteListVulSet().stream().map(this::escapeHtml).collect(Collectors.toList()))).append(" </p>\n");
+            }
+        }
+        
+        // Close the HTML content
+        htmlContent.append("</body>\n</html>");
+    
+        // Write the HTML content to file
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(reportFile))) {
-            writer.write(htmlContent);
+            writer.write(htmlContent.toString());
         }
-        // No need for catch block here if you're just throwing the exceptions
     }
-
+    
     private String getVulnerabilityRowHtml(Vulnerability vulnerability, String severity) {
         return "<tr>\n" +
             "<td><a target=\"_blank\" href=\"" + escapeHtml(vulnerability.getLink()) + "\">" +
             escapeHtml(vulnerability.getName()).toUpperCase() + "</a></td>\n" +
             "<td>" + severity + "</td>\n" +
             "<td>" + vulnerability.getScore() + "</td>\n" +
-            "<td>" + escapeHtml(vulnerability.getPackage_name() + ":" + vulnerability.getPackage_version()) + "</td>\n" +
+            "<td>" + escapeHtml(vulnerability.getPackage_name()) + ":" + escapeHtml(vulnerability.getPackage_version()) + "</td>\n" +
+            "<td>" + escapeHtml(vulnerability.getFile_name()) + "</td>\n" +
             "<td>" + escapeHtml(vulnerability.getFixed_version()) + "</td>\n" +
             "<td>" + escapeHtml(vulnerability.getVectors()) + "</td>\n" +
             "<td>" + escapeHtml(vulnerability.getDescription()) + "</td>\n" +
             "<td>" + escapeHtml(vulnerability.getFeed_rating()) + "</td>\n" +
             "</tr>\n";
     }
-
+    
     private String escapeHtml(String text) {
         if (text == null) {
-            return null; // Return null if the input string is null
+            return ""; // Return an empty string if the input string is null
         }
-        
         return text.replace("&", "&amp;")
                    .replace("<", "&lt;")
                    .replace(">", "&gt;")
                    .replace("\"", "&quot;")
                    .replace("'", "&#039;");
-    }    
-}
+    }
+}   
