@@ -1,8 +1,6 @@
-name: Manual Dependabot Update
-
+name: Run Dependabot Update
 on:
   workflow_dispatch:
-
 jobs:
   dependabot:
     runs-on: ubuntu-latest
@@ -10,8 +8,7 @@ jobs:
     - name: Checkout the repo
       uses: actions/checkout@v2
       with:
-        ref: master # 这里指定了始终检出 main 分支
-
+        ref: master
     - name: Setup repo with fake secret (trigger Dependabot)
       env:
         FAKE_SECRET: ${{ secrets.FAKE_SECRET }}
