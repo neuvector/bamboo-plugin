@@ -10,7 +10,7 @@ jobs:
     - name: Checkout the repo
       uses: actions/checkout@v2
       with:
-        ref: 'NVSHAS-8744' # 这里指定了始终检出 main 分支
+        ref: NVSHAS-8744 # 这里指定了始终检出 main 分支
 
     - name: Setup repo with fake secret (trigger Dependabot)
       env:
