@@ -1,0 +1,21 @@
+name: Run Dependabot Update
+on:
+  workflow_dispatch:
+jobs:
+  dependabot:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout the repo
+      uses: actions/checkout@v2
+      with:
+        ref: master # 这里指定了始终检出 main 分支
+
+    - name: Setup repo with fake secret (trigger Dependabot)
+      env:
+        FAKE_SECRET: ${{ secrets.FAKE_SECRET }}
+      run: |
+        sed -i 's/FAKE_SECRET/'"$FAKE_SECRET"'/g' .github/dependabot.yml
+        git config user.name 'github-actions[bot]'
+        git config user.email 'github-actions[bot]@users.noreply.github.com'
+        git commit -am "Trigger Dependabot" --allow-empty
+        git push origin main
