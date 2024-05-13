@@ -16,10 +16,14 @@ public class ScanConfig {
     private String registryType;
     private String repository;
     private String tag;
+
     private boolean scanLayers;
     private boolean enableStandalone;
-    private String highVul;
-    private String mediumVul;
+    private boolean isUpgradedToIncludeCriticalSeverity;
+
+    // private String criticalVul;
+    // private String highVul;
+    // private String mediumVul;
     private String controllerIP;
     private String controllerPortString;
     private int controllerPort;
@@ -33,6 +37,14 @@ public class ScanConfig {
     private String scannerRegistryUsername;
     private String scannerRegistryPassword;
 
+    private Integer numberOfCriticalSeverityToFail = 0;
+    private Integer numberOfHighSeverityToFail = 0;
+    private Integer numberOfMediumSeverityToFail = 0;
+
+    private String  criticalVulFailureLimit;
+    private String  highVulFailureLimit;
+    private String  mediumVulFailureLimit;
+
     private Set<String> vulBlackListSet;
     private Set<String> vulWhiteListSet;
 
@@ -40,10 +52,13 @@ public class ScanConfig {
         enableStandalone = Boolean.valueOf((String)taskContext.getConfigurationMap().get("enableStandalone"));
         repository = (String)taskContext.getConfigurationMap().get("repository");
         scanLayers = Boolean.valueOf((String)taskContext.getConfigurationMap().get("scanLayers"));
-        highVul = (String)taskContext.getConfigurationMap().get("highVul");
-        mediumVul = (String)taskContext.getConfigurationMap().get("mediumVul");
+
+        taskContext.getBuildLogger().addBuildLogEntry("taskContext.getConfigurationMap(): " + taskContext.getConfigurationMap());
+
+        criticalVulFailureLimit = (String)taskContext.getConfigurationMap().get("criticalVul");
+        highVulFailureLimit = (String)taskContext.getConfigurationMap().get("highVul");
+        mediumVulFailureLimit = (String)taskContext.getConfigurationMap().get("mediumVul");
         tag = (String)taskContext.getConfigurationMap().get("tag");
-        
         registryType = (String)taskContext.getConfigurationMap().get("registryType");
         if (registryType != null && registryType.equals("custom")) {
             registryURL = (String)taskContext.getConfigurationMap().get("customRegistryURL");
@@ -60,22 +75,60 @@ public class ScanConfig {
         scanResult.setRepository(repository);
         scanResult.setTag(tag);
 
-        int highSeverityThreshold = 0;
-        if(!highVul.isEmpty()){
-            try {
-                highSeverityThreshold = Integer.parseInt(highVul);
-            } finally {
-                scanResult.setHighSeverityThreshold(highSeverityThreshold);
-            }
-        }
+        // Parsing and setting the medium severity threshold
+        numberOfMediumSeverityToFail = parseAndSetSeverityThresholdToFail(mediumVulFailureLimit, taskContext, 0);
 
-        int mediumSeverityThreshold = 0;
-        if(!mediumVul.isEmpty()){
-            try {
-                mediumSeverityThreshold = Integer.parseInt(mediumVul);
-            } finally {
-                scanResult.setMediumSeverityThreshold(mediumSeverityThreshold);
-            }
+        // Parsing and setting the high severity threshold
+        numberOfHighSeverityToFail = parseAndSetSeverityThresholdToFail(highVulFailureLimit, taskContext, 0);
+
+        // int mediumVulFailureLimit = 0;
+        // // Check if mediumVul is not null
+        // if (mediumVulFailureLimit != null) {
+        //     // Further check if mediumVul is not empty
+        //     if (!mediumVulFailureLimit.isEmpty()) {
+        //         try {
+        //             mediumVulFailureLimit = Integer.parseInt(mediumVulFailureLimit);
+        //         } catch (NumberFormatException e) {
+        //             taskContext.getBuildLogger().addBuildLogEntry("Invalid number format: " + mediumVul);
+        //             // Handle the error, maybe set a default value or log the error
+        //         } finally {
+        //             numberOfMediumSeverityToFail = mediumVulFailureLimit;
+        //         }
+        //     } else {
+        //         taskContext.getBuildLogger().addBuildLogEntry("mediumVul is empty");
+        //         // Handle the case where mediumVul is empty, maybe set a default value or log this condition
+        //     }
+        // } else {
+        //     taskContext.getBuildLogger().addBuildLogEntry("mediumVul is null");
+        //     // Handle the case where mediumVul is null, maybe set a default value or log this condition
+        // }
+
+        // int highSeverityThreshold = 0;
+        // if(!highVul.isEmpty()){
+        //     try {
+        //         highSeverityThreshold = Integer.parseInt(highVul);
+        //     } finally {
+        //         numberOfHighSeverityToFail = highSeverityThreshold;
+        //     }
+        // }
+
+        // int criticalSeverityThreshold = 0;
+        if(criticalVulFailureLimit == null) {
+                /*
+                 * Support Critical, Medium, and High severity thresholds in new version, add this condition for backward compatibility.
+                 * If critical is not set, we assume that this is a migrate from the version prior to the support of Critical, Medium, and High.
+                 */
+                isUpgradedToIncludeCriticalSeverity = true;
+                scanResult.setAboveHighSeverityNumber(numberOfHighSeverityToFail);
+        } else {
+            // if(!criticalVul.isEmpty()){
+            //     try {
+            //         criticalSeverityThreshold = Integer.parseInt(criticalVul);
+            //     } finally {
+            //         numberOfCriticalSeverityToFail = criticalSeverityThreshold;
+            //     }
+            // }
+            numberOfCriticalSeverityToFail = parseAndSetSeverityThresholdToFail(criticalVulFailureLimit, taskContext, 0);
         }
 
         String storedVulnsToFail = (String)taskContext.getConfigurationMap().get("vulnerabilitiesToFail").toLowerCase();
@@ -104,6 +157,26 @@ public class ScanConfig {
         scannerImageRepository = AdminConfigUtil.getAdminConfig("scannerImageRepository");
         scannerRegistryUsername = AdminConfigUtil.getAdminConfig("scannerRegistryUsername");
         scannerRegistryPassword = AdminConfigUtil.getAdminConfig("scannerRegistryPassword");
+    }
+
+    /**
+     * Attempts to parse a string as an integer to set a severity threshold.
+     * If parsing fails, it logs an error and sets a default value.
+     *
+     * @param vulValue the string input representing the severity threshold.
+     * @param taskContext the task context for logging.
+     * @param defaultValue the default value to use if parsing fails or the input is empty.
+     * @return the parsed or default severity threshold.
+     */
+    public static Integer parseAndSetSeverityThresholdToFail(String vulValue, TaskContext taskContext, Integer defaultValue) {
+        if (vulValue != null && !vulValue.isEmpty()) {
+            try {
+                return Integer.parseInt(vulValue);
+            } catch (NumberFormatException e) {
+                taskContext.getBuildLogger().addBuildLogEntry("Invalid number format: " + vulValue);
+            }
+        }
+        return defaultValue;  // Return default value in case of empty input or parse failure
     }
 
     public String getToken() {
@@ -154,21 +227,22 @@ public class ScanConfig {
         this.enableStandalone = enableStandalone;
     }
 
-    public String getHighVul() {
-        return highVul;
-    }
+    // how much to fail
+    // public String getHighVul() {
+    //     return highVul;
+    // }
 
-    public void setHighVul(String highVul) {
-        this.highVul = highVul;
-    }
+    // public void setHighVul(String highVul) {
+    //     this.highVul = highVul;
+    // }
 
-    public String getMediumVul() {
-        return mediumVul;
-    }
+    // public String getMediumVul() {
+    //     return mediumVul;
+    // }
 
-    public void setMediumVul(String mediumVul) {
-        this.mediumVul = mediumVul;
-    }
+    // public void setMediumVul(String mediumVul) {
+    //     this.mediumVul = mediumVul;
+    // }
 
     public String getControllerIP() {
         return controllerIP;
@@ -280,5 +354,37 @@ public class ScanConfig {
 
     public void setVulWhiteListSet(Set<String> vulWhiteListSet) {
         this.vulWhiteListSet = vulWhiteListSet;
+    }
+
+    public boolean getIsUpgradedToIncludeCriticalSeverity() {
+        return isUpgradedToIncludeCriticalSeverity;
+    }
+
+    public void setIsUpgradedToIncludeCriticalSeverity(boolean value) {
+        isUpgradedToIncludeCriticalSeverity = value;
+    }
+
+    public Integer getNumberOfCriticalSeverityToFail() {
+        return numberOfCriticalSeverityToFail;
+    }
+
+    public void setNumberOfCriticalSeverityToFail(Integer numberOfCriticalSeverityToFail) {
+        this.numberOfCriticalSeverityToFail = numberOfCriticalSeverityToFail;
+    }
+
+    public Integer getNumberOfHighSeverityToFail() {
+        return numberOfHighSeverityToFail;
+    }
+
+    public void setNumberOfHighSeverityToFail(Integer numberOfHighSeverityToFail) {
+        this.numberOfHighSeverityToFail = numberOfHighSeverityToFail;
+    }
+
+    public Integer getNumberOfMediumSeverityToFail() {
+        return numberOfMediumSeverityToFail;
+    }
+
+    public void setNumberOfMediumSeverityToFail(Integer numberOfMediumSeverityToFail) {
+        this.numberOfMediumSeverityToFail = numberOfMediumSeverityToFail;
     }
 }

@@ -1,5 +1,7 @@
 package neuvector;
 
+import com.atlassian.spring.container.ContainerManager;
+import com.atlassian.bamboo.configuration.AdministrationConfiguration;
 import com.atlassian.bamboo.build.logger.BuildLogger;
 import com.atlassian.bamboo.task.TaskContext;
 import com.atlassian.bamboo.task.TaskException;
@@ -26,12 +28,16 @@ import java.util.stream.Collectors;
 import neuvector.report.*;
 import neuvector.scanner.*;
 
+import org.apache.commons.lang3.math.NumberUtils;
+
 public class NeuVectorScannerTask implements TaskType {
     private BuildLogger buildLogger;
     private ScanConfig scanConfig;
 
     private StandaloneScanner standaloneScanner;
     private ControllerScanner controllerScanner;
+    private NeuVectorGlobalConfigurator nvConfigurator = new NeuVectorGlobalConfigurator();
+    final AdministrationConfiguration adminConfig = (AdministrationConfiguration) ContainerManager.getComponent("administrationConfiguration");
 
     @Override
     public TaskResult execute(final TaskContext taskContext) throws TaskException {
@@ -76,11 +82,43 @@ public class NeuVectorScannerTask implements TaskType {
         }
     }
 
+    private Double getCustomThresholdScore(String threshold) {
+        double thresholdScore = 0.0;
+        String thresholdScoreStr = adminConfig.getSystemProperty("customCriticalThreshold");
+
+        if (NumberUtils.isParsable(thresholdScoreStr)) {
+            thresholdScore = Double.parseDouble(thresholdScoreStr);
+        }
+        return thresholdScore;
+    }
+
+    // getSeverity(Double.parseDouble(s_score), criticalSeverityScaleThreshold, highSeverityScaleThreshold, mediumSeverityScaleThreshold);
+    private String getSeverity(Double score, ScanResult scanResult, String defaultSeverity) {
+        boolean isCustomThreshold = Boolean.parseBoolean(AdminConfigUtil.getAdminConfig("isCustomThreshold")); 
+        String severity = defaultSeverity;
+
+        if (isCustomThreshold) {
+            scanResult.setCriticalSeverityThreshold(getCustomThresholdScore("customCriticalThreshold"));
+            scanResult.setHighSeverityThreshold(getCustomThresholdScore("customHighThreshold"));
+            scanResult.setMediumSeverityThreshold(getCustomThresholdScore("customMediumThreshold"));
+
+            if (score >= scanResult.getCriticalSeverityThreshold()){
+                severity = SeverityRating.Critical.name();
+            } else if (score >= scanResult.getHighSeverityThreshold()){
+                severity = SeverityRating.High.name();
+            } else if(score >= scanResult.getMediumSeverityThreshold()){
+                severity = SeverityRating.Medium.name();
+            }
+        }
+        return severity;
+    }
+    
     private void processScanReport(ProcessResult processResult) throws TaskException {
         String serverMessageFromScan = processResult.getScanResultString();
         ScanResult scanResult = processResult.getScanResult();
 
         int totalVulnerabilityNumber = 0;
+        int totalCriticalSeverity = 0;
         int totalHighSeverity = 0;
         int totalMediumSeverity = 0;
 
@@ -88,6 +126,8 @@ public class NeuVectorScannerTask implements TaskType {
         boolean hasWhiteListVuls = false;
         Set<String> existedBlackListVulSet = new HashSet<>();
         Set<String> existedWhiteListVulSet = new HashSet<>();
+
+        Set<Vulnerability> criticalVulnerabilitySet = new HashSet<>();
         Set<Vulnerability> highVulnerabilitySet = new HashSet<>();
         Set<Vulnerability> mediumVulnerabilitySet = new HashSet<>();
 
@@ -109,7 +149,7 @@ public class NeuVectorScannerTask implements TaskType {
             for (int i = 0; i < vulnerabilityArray.size(); i++) {
                 JsonObject vulnerabilityObject = vulnerabilityArray.get(i).getAsJsonObject();
                 String name = vulnerabilityObject.get("name").getAsString().toLowerCase();
-                String severity = vulnerabilityObject.get("severity").getAsString();
+                String severity = getSeverity(Double.parseDouble(vulnerabilityObject.get("score").getAsString()), scanResult, vulnerabilityObject.get("severity").getAsString());
                 if (!scanConfig.getVulBlackListSet().isEmpty() && scanConfig.getVulBlackListSet().contains(name)) {
                     hasBlackListVuls = true;
                     existedBlackListVulSet.add(name.toUpperCase());
@@ -130,7 +170,11 @@ public class NeuVectorScannerTask implements TaskType {
                     vulnerability.setDescription(vulnerabilityObject.get("description").getAsString());
                     vulnerability.setFeed_rating(vulnerabilityObject.get("feed_rating").getAsString());
 
-                    if (severity.equalsIgnoreCase("High")) {
+                    if(severity.equalsIgnoreCase("Critical")) {
+                        totalCriticalSeverity = totalCriticalSeverity + 1;
+                        vulnerability.setSeverity("Critical");
+                        criticalVulnerabilitySet.add(vulnerability);
+                    } else if (severity.equalsIgnoreCase("High")) {
                         totalHighSeverity = totalHighSeverity + 1;
                         vulnerability.setSeverity("High");
                         highVulnerabilitySet.add(vulnerability);
@@ -154,8 +198,12 @@ public class NeuVectorScannerTask implements TaskType {
         scanResult.setExistedBlackListVulSet(existedBlackListVulSet);
         scanResult.setExistedWhiteListVulSet(existedWhiteListVulSet);
         scanResult.setTotalVulnerabilityNumber(totalVulnerabilityNumber);
+
+        scanResult.setCriticalSeverityNumber(totalCriticalSeverity);
         scanResult.setHighSeverityNumber(totalHighSeverity);
         scanResult.setMediumSeverityNumber(totalMediumSeverity);
+
+        scanResult.setCriticalVulnerabilitySet(criticalVulnerabilitySet);
         scanResult.setHighVulnerabilitySet(highVulnerabilitySet);
         scanResult.setMediumVulnerabilitySet(mediumVulnerabilitySet);
 
@@ -202,43 +250,73 @@ public class NeuVectorScannerTask implements TaskType {
         }
     }
 
+    // add the critical related thing
     private void makeIfFailDecision(ProcessResult processResult) {
+        ScanResult scanResult = processResult.getScanResult();
+
+        int aboveHighSeverityNumber = scanResult.getAboveHighSeverityNumber();
+        int currentCriticalSeverity = scanResult.getCriticalSeverityNumber();
+        int currentHighSeverity = scanResult.getHighSeverityNumber();
+        int currentMediumSeverity = scanResult.getMediumSeverityNumber();
+        
+        int totalCriticalSeverity = processResult.getScanResult().getCriticalSeverityNumber();
         int totalHighSeverity = processResult.getScanResult().getHighSeverityNumber();
         int totalMediumSeverity = processResult.getScanResult().getMediumSeverityNumber();
         boolean foundNameInBlackList = processResult.getScanResult().isBlackListVulExisted();
         Set<String> blackListToPresent = processResult.getScanResult().getExistedBlackListVulSet();
 
         boolean numberExceed = false;
+        boolean criticalExceed = false;
+        boolean highExceed = false;
+        boolean medExceed = false;
         StringBuilder statementBuilder = new StringBuilder();
 
-        if (scanConfig.getHighVul() != null && !scanConfig.getHighVul().trim().isEmpty()) {
-            int configNumberOfHigh = Integer.parseInt(scanConfig.getHighVul().trim());
-            if (configNumberOfHigh != 0 && configNumberOfHigh <= totalHighSeverity) {
-                numberExceed = true;
-                statementBuilder.append(totalHighSeverity).append(" High severity vulnerabilities");
+        if (scanConfig.getNumberOfCriticalSeverityToFail() != null) {
+            if (scanConfig.getNumberOfCriticalSeverityToFail() != 0 && scanConfig.getNumberOfCriticalSeverityToFail() <= currentCriticalSeverity) {
+                criticalExceed = true;
+                statementBuilder.append(currentCriticalSeverity).append(" Critical severity vulnerabilities");
             }
         }
 
-        if (scanConfig.getMediumVul() != null && !scanConfig.getMediumVul().trim().isEmpty()) {
-            int configNumberOfMedium = Integer.parseInt(scanConfig.getMediumVul().trim());
-            if (configNumberOfMedium != 0 && configNumberOfMedium <= totalMediumSeverity) {
-                if (numberExceed) {
+        if (scanConfig.getNumberOfHighSeverityToFail() != null) {
+            if (scanConfig.getNumberOfHighSeverityToFail() != 0 && scanConfig.getNumberOfHighSeverityToFail() <= currentCriticalSeverity) {
+                if (criticalExceed) {
                     statementBuilder.append(", ");
                 }
-                numberExceed = true;
-                statementBuilder.append(totalMediumSeverity).append(" Medium severity vulnerabilities");
+                highExceed = true;
+                statementBuilder.append(currentHighSeverity).append(" High severity vulnerabilities");
             }
         }
+
+        if (scanConfig.getNumberOfMediumSeverityToFail() != null) {
+            if (scanConfig.getNumberOfMediumSeverityToFail() != 0 && scanConfig.getNumberOfMediumSeverityToFail() <= currentCriticalSeverity) {
+                if (criticalExceed || highExceed) {
+                    statementBuilder.append(", ");
+                }
+                medExceed = true;
+                statementBuilder.append(currentMediumSeverity).append(" Medium severity vulnerabilities");
+            }
+        }
+
+        // Handle the upgrade to include critical severity cases.
+        if ((!criticalExceed && !highExceed) && scanConfig.getIsUpgradedToIncludeCriticalSeverity()) {
+            if (aboveHighSeverityNumber != 0 && aboveHighSeverityNumber <= (currentCriticalSeverity + currentHighSeverity)) {
+                numberExceed = true;
+                statementBuilder.append(currentCriticalSeverity).append(" Critical severity vulnerabilities, ");
+                statementBuilder.append(currentHighSeverity).append(" High severity vulnerabilities");
+            }
+        }
+
+        numberExceed = (numberExceed || criticalExceed || highExceed || medExceed);
 
         if (foundNameInBlackList) {
             if (numberExceed) {
                 statementBuilder.append(", and ");
             }
-            numberExceed = true;
             statementBuilder.append("vulnerabilities: ").append(blackListToPresent.toString());
         }
 
-        if (numberExceed) {
+        if (numberExceed || foundNameInBlackList) {
             statementBuilder.append(" are present.");
             buildLogger.addErrorLogEntry("Build failed because " + statementBuilder.toString());
             processResult.setSuccess(false);
@@ -275,6 +353,7 @@ public class NeuVectorScannerTask implements TaskType {
             }
             writer.write("Repository: " + scanResult.getRepository() + "\n");
             writer.write("Tag: " + scanResult.getTag() + "\n");
+            writer.write("Critical severity vulnerabilities: " + scanResult.getCriticalSeverityNumber() + "\n");
             writer.write("High severity vulnerabilities: " + scanResult.getHighSeverityNumber() + "\n");
             writer.write("Medium severity vulnerabilities: " + scanResult.getMediumSeverityNumber() + "\n");
             writer.write("Total vulnerabilities: " + scanResult.getTotalVulnerabilityNumber() + "\n");
@@ -285,6 +364,9 @@ public class NeuVectorScannerTask implements TaskType {
                 writer.write("Scanned. No vulnerabilities found.\n");
             } else {
                 // Detailed vulnerabilities
+                for (Vulnerability vulnerability : scanResult.getCriticalVulnerabilitySet()) {
+                    writeTxtReportVulnerabilityDetails(writer, vulnerability, "Critical");
+                }
                 for (Vulnerability vulnerability : scanResult.getHighVulnerabilitySet()) {
                     writeTxtReportVulnerabilityDetails(writer, vulnerability, "High");
                 }
@@ -365,6 +447,8 @@ public class NeuVectorScannerTask implements TaskType {
             .append("<th>Registry URL</th>\n")
             .append("<th>Repository</th>\n")
             .append("<th>Tag</th>\n")
+            .append("<th>Critical severity VULs</th>\n")
+            .append("<th>Critical severity threshold</th>\n")
             .append("<th>High severity VULs</th>\n")
             .append("<th>High severity threshold</th>\n")
             .append("<th>Medium severity VULs</th>\n")
@@ -376,10 +460,12 @@ public class NeuVectorScannerTask implements TaskType {
             .append("<td>").append(escapeHtml(scanResult.getRegistry())).append("</td>\n")
             .append("<td>").append(escapeHtml(scanResult.getRepository())).append("</td>\n")
             .append("<td>").append(escapeHtml(scanResult.getTag())).append("</td>\n")
+            .append("<td>").append(Integer.toString(scanResult.getCriticalVulnerabilitySet().size())).append("</td>\n")
+            .append("<td>").append(scanResult.getCriticalSeverityThreshold() != 0.0 ? Double.toString(scanResult.getCriticalSeverityThreshold()) : "No Limit").append("</td>\n")
             .append("<td>").append(Integer.toString(scanResult.getHighVulnerabilitySet().size())).append("</td>\n")
-            .append("<td>").append(scanResult.getHighSeverityThreshold() != 0 ? Integer.toString(scanResult.getHighSeverityThreshold()) : "No Limit").append("</td>\n")
+            .append("<td>").append(scanResult.getHighSeverityThreshold() != 0.0 ? Double.toString(scanResult.getHighSeverityThreshold()) : "No Limit").append("</td>\n")
             .append("<td>").append(Integer.toString(scanResult.getMediumVulnerabilitySet().size())).append("</td>\n")
-            .append("<td>").append(scanResult.getMediumSeverityThreshold() != 0 ? Integer.toString(scanResult.getMediumSeverityThreshold()) : "No Limit").append("</td>\n")
+            .append("<td>").append(scanResult.getMediumSeverityThreshold() != 0.0 ? Double.toString(scanResult.getMediumSeverityThreshold()) : "No Limit").append("</td>\n")
             .append("<td>").append(escapeHtml(String.join(", ", scanResult.getExistedBlackListVulSet()))).append("</td>\n")
             .append("<td>").append(Integer.toString(scanResult.getTotalVulnerabilityNumber())).append("</td>\n")
             .append("</tr>\n")
@@ -400,6 +486,11 @@ public class NeuVectorScannerTask implements TaskType {
                 .append("<th>Description</th>\n")
                 .append("<th>Feed_rating</th>\n")
                 .append("</tr>\n");
+
+            // Critical vulnerabilities
+            for (Vulnerability vulnerability : scanResult.getCriticalVulnerabilitySet()) {
+                htmlContent.append(getVulnerabilityRowHtml(vulnerability, "Critical"));
+            }
             // High vulnerabilities
             for (Vulnerability vulnerability : scanResult.getHighVulnerabilitySet()) {
                 htmlContent.append(getVulnerabilityRowHtml(vulnerability, "High"));

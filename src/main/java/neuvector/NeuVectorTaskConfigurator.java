@@ -37,6 +37,7 @@ public class NeuVectorTaskConfigurator extends AbstractTaskConfigurator {
         config.put("repository", params.getString("repository"));
         config.put("tag", params.getString("tag"));
         config.put("scanLayers", params.getString("scanLayers"));
+        config.put("criticalVul", params.getString("criticalVul"));
         config.put("highVul", params.getString("highVul"));
         config.put("mediumVul", params.getString("mediumVul"));
         if (registryType != null && registryType.equals("custom")) {
@@ -85,6 +86,7 @@ public class NeuVectorTaskConfigurator extends AbstractTaskConfigurator {
         context.put("repository", taskDefinition.getConfiguration().get("repository"));
         context.put("tag", taskDefinition.getConfiguration().get("tag"));
         context.put("scanLayers", taskDefinition.getConfiguration().get("scanLayers"));
+        context.put("criticalVul", taskDefinition.getConfiguration().get("criticalVul"));
         context.put("highVul", taskDefinition.getConfiguration().get("highVul"));
         context.put("mediumVul", taskDefinition.getConfiguration().get("mediumVul"));
         if (registryType != null && registryType.equals("custom")) {
