@@ -1,6 +1,5 @@
 package neuvector.report;
 
-
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Set;
@@ -19,13 +18,18 @@ public class ScanResult {
     Set<String> existedBlackListVulSet = new HashSet<>();
     Set<String> existedWhiteListVulSet = new HashSet<>();
     boolean isSeverityScaleCustomized;
+    double customizedCriticalSeverityScale;
     double customizedHighSeverityScale;
     double customizedMediumSeverityScale;
-    int highSeverityThreshold;
-    int mediumSeverityThreshold;
+    Double criticalSeverityThreshold = 0.0;
+    Double highSeverityThreshold = 0.0;
+    Double mediumSeverityThreshold = 0.0;
+    int aboveHighSeverityNumber;
+    int criticalSeverityNumber; // total found high severity vuls number
     int highSeverityNumber; // total found high severity vuls number
     int mediumSeverityNumber; // total found medium severity vuls number
     int totalVulnerabilityNumber; // total vuls number
+    Set<Vulnerability> criticalVulnerabilitySet = new HashSet<>();
     Set<Vulnerability> highVulnerabilitySet = new HashSet<>();
     Set<Vulnerability> mediumVulnerabilitySet = new HashSet<>();
     boolean scanLayerConfigured;
@@ -50,6 +54,22 @@ public class ScanResult {
         this.errorMessage = errorMessage;
     }
 
+    public int getAboveHighSeverityNumber() {
+        return aboveHighSeverityNumber;
+    }
+
+    public void setAboveHighSeverityNumber(int aboveHighSeverityNumber) {
+        this.aboveHighSeverityNumber = aboveHighSeverityNumber;
+    }
+
+    public int getCriticalSeverityNumber() {
+        return criticalSeverityNumber;
+    }
+
+    public void setCriticalSeverityNumber(int criticalSeverityNumber) {
+        this.criticalSeverityNumber = criticalSeverityNumber;
+    }
+ 
     public int getHighSeverityNumber() {
         return highSeverityNumber;
     }
@@ -154,6 +174,14 @@ public class ScanResult {
         isSeverityScaleCustomized = severityScaleCustomized;
     }
 
+    public double getCustomizedCriticalSeverityScale() {
+        return customizedCriticalSeverityScale;
+    }
+
+    public void setCustomizedCriticalSeverityScale(double customizedCriticalSeverityScale) {
+        this.customizedCriticalSeverityScale = customizedCriticalSeverityScale;
+    }
+
     public double getCustomizedHighSeverityScale() {
         return customizedHighSeverityScale;
     }
@@ -170,19 +198,27 @@ public class ScanResult {
         this.customizedMediumSeverityScale = customizedMediumSeverityScale;
     }
 
-    public int getHighSeverityThreshold() {
+    public Double getCriticalSeverityThreshold() {
+        return criticalSeverityThreshold;
+    }
+
+    public void setCriticalSeverityThreshold(Double criticalSeverityThreshold) {
+        this.criticalSeverityThreshold = criticalSeverityThreshold;
+    }
+
+    public Double getHighSeverityThreshold() {
         return highSeverityThreshold;
     }
 
-    public void setHighSeverityThreshold(int highSeverityThreshold) {
+    public void setHighSeverityThreshold(Double highSeverityThreshold) {
         this.highSeverityThreshold = highSeverityThreshold;
     }
 
-    public int getMediumSeverityThreshold() {
+    public Double getMediumSeverityThreshold() {
         return mediumSeverityThreshold;
     }
 
-    public void setMediumSeverityThreshold(int mediumSeverityThreshold) {
+    public void setMediumSeverityThreshold(Double mediumSeverityThreshold) {
         this.mediumSeverityThreshold = mediumSeverityThreshold;
     }
 
@@ -192,6 +228,15 @@ public class ScanResult {
 
     public void setTotalVulnerabilityNumber(int totalVulnerabilityNumber) {
         this.totalVulnerabilityNumber = totalVulnerabilityNumber;
+    }
+
+    public Set<Vulnerability> getCriticalVulnerabilitySet() {
+        return criticalVulnerabilitySet;
+    }
+
+    public void setCriticalVulnerabilitySet(Set<Vulnerability> criticalVulnerabilitySet) {
+        this.criticalVulnerabilitySet = criticalVulnerabilitySet;
+
     }
 
     public Set<Vulnerability> getHighVulnerabilitySet() {

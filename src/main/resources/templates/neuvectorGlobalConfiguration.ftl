@@ -24,6 +24,12 @@
         [@ww.textfield labelKey="NeuVector Scanner Registry User" name="scannerRegistryUsername" description="Enter the NeuVector Scanner Registry username, if applicable." required="false"/]
         [@ww.password labelKey="NeuVector Scanner Registry Password" name="scannerRegistryPassword" description="Enter the NeuVector Scanner Registry password, if applicable." showPassword="true" required="false"/]
 	[/@ui.bambooSection]
+
+	[@ui.bambooSection titleKey="NeuVector Custom Criteria Configuration"]
+		[@ww.textfield labelKey="Custom Critical Severity Threshold" name="customCriticalThreshold" description="From the Critical Severity Threshold to 10.0 is the Critical Severity Range. Vulnerabilities that score in the Critical Severity Range has the Critical severity level.." required="false"/]
+        [@ww.textfield labelKey="Custom High Severity Threshold" name="customHighThreshold" description="From the High Severity Threshold to Critical Severity Threshold is the High Severity Range. Vulnerabilities that score in the High Severity Range has the High severity level." required="false"/]
+        [@ww.textfield labelKey="Custom Medium Severity Threshold" name="customMediumThreshold" description="From the Medium Severity Threshold to the High Severity Threshold is the Medium Severity Range. Vulnerabilities that score in the Medium Severity Range has the Medium severity level." required="false"/]
+	[/@ui.bambooSection]
 [/@ww.form]
 </body>
 </html>

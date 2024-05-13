@@ -163,6 +163,19 @@
         </plugins>
     </build>
 
+<pluginRepositories>
+    <pluginRepository>
+        <id>atlassian-public</id>
+        <url>https://m2proxy.atlassian.com/repository/public/</url>
+        <releases>
+            <enabled>true</enabled>
+        </releases>
+        <snapshots>
+            <enabled>true</enabled>
+        </snapshots>
+    </pluginRepository>
+</pluginRepositories>
+
 <repositories>
     <repository>
         <id>atlassian-public</id>
@@ -175,5 +188,4 @@
         </snapshots>
     </repository>
 </repositories>
-
 </project>

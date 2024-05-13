@@ -8,6 +8,7 @@
 [@ww.textfield label="Repository" name="repository" required="true"/]
 [@ww.textfield label="Tag" name="tag" required="true"/]
 [@ww.checkbox label="Scan Layers" name="scanLayers" toggle="true" required="false"/]
+[@ww.textfield label="Critical vulnerabilities to fail" name="criticalVul" required="false"/]
 [@ww.textfield label="High vulnerabilities to fail" name="highVul" required="false"/]
 [@ww.textfield label="Medium vulnerabilities to fail" name="mediumVul" required="false"/>
 
