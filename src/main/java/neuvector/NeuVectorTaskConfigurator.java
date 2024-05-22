@@ -12,6 +12,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Arrays;
 import java.util.stream.Collectors;
+import java.util.Set;
 
 import com.opensymphony.xwork2.ActionContext;
 import javax.servlet.http.HttpServletRequest;
@@ -19,6 +20,7 @@ import org.apache.commons.lang3.StringUtils;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.gson.Gson;
+import neuvector.utils.DockerRegistryClient;
 
 public class NeuVectorTaskConfigurator extends AbstractTaskConfigurator {    
     private Map<String, String> registryMap;
@@ -34,7 +36,6 @@ public class NeuVectorTaskConfigurator extends AbstractTaskConfigurator {
         final Map<String, String> config = super.generateTaskConfigMap(params, previousTaskDefinition);
         String registryType = params.getString("registryType");
         config.put("registryType", registryType);
-        config.put("repository", params.getString("repository"));
         config.put("tag", params.getString("tag"));
         config.put("scanLayers", params.getString("scanLayers"));
         config.put("highVul", params.getString("highVul"));
@@ -44,6 +45,13 @@ public class NeuVectorTaskConfigurator extends AbstractTaskConfigurator {
             config.put("customRegistryUsername", params.getString("customRegistryUsername"));
             config.put("customRegistryPassword", params.getString("customRegistryPassword"));
         }
+        
+        config.put("repository", prepareRepository(
+            params.getString("customRegistryUsername"),
+            params.getString("customRegistryPassword"),
+            params.getString("repository"),
+            params.getString("tag")
+        ));
 
         boolean enableStandaloneValue = params.getBoolean("enableStandalone");
         config.put("enableStandalone", Boolean.toString(enableStandaloneValue));
@@ -62,6 +70,11 @@ public class NeuVectorTaskConfigurator extends AbstractTaskConfigurator {
         return config;
     }
 
+    public static String getLastElementInRepoString(String input) {
+        String[] parts = input.split("/");
+        return parts[parts.length - 1];
+    }
+
     private String getJoinedParameterValues(Map<String, String[]> parameterMap, String paramNameStart) {
         return parameterMap.entrySet().stream()
                 .filter(entry -> entry.getKey().startsWith(paramNameStart))
@@ -75,6 +88,37 @@ public class NeuVectorTaskConfigurator extends AbstractTaskConfigurator {
         context.put("registryType", "global");
         context.put("registryMap", this.registryMap);
         context.put("enableStandalone", false);
+        context.put("sendReportToController", false);
+    }
+
+    /*
+    * repository will be formulated to "{username}/{repository}".
+    * If the username is empty, consider it a public registry and add "library/" prefix.
+    * If the input already contains a "/", we consider it already formulated.
+    */
+    private String prepareRepository(String registryUsername, String registryPassword, String repository, String tag) {
+        String currentRepository = repository;
+        if (!currentRepository.isEmpty()) {
+            String repoStr = getLastElementInRepoString(currentRepository);
+            DockerRegistryClient dockerRegistryClient = new DockerRegistryClient(registryUsername, registryPassword);
+
+            try {
+                Set<String> repoWithTags = dockerRegistryClient.getAllRepositoriesWithTagsAll();
+                String scanRepoWithTag = repoStr + ":" + tag;
+                if (repoWithTags.contains(scanRepoWithTag)) {
+                    currentRepository = registryUsername + "/" + repoStr;
+                } else {
+                    currentRepository = "library/" + repoStr;
+                }
+            } catch (Exception e) {
+                System.out.println("Error retrieving repositories and tags: " + e.getMessage());
+            }
+        } else {
+            if (!currentRepository.contains("/")) {
+                currentRepository = "library/" + currentRepository;
+            }
+        }
+        return currentRepository;
     }
 
     public void populateContextForEdit(@NotNull final Map<String, Object> context, @NotNull final TaskDefinition taskDefinition) {
@@ -82,7 +126,6 @@ public class NeuVectorTaskConfigurator extends AbstractTaskConfigurator {
         String registryType = taskDefinition.getConfiguration().get("registryType");
         context.put("registryMap", this.registryMap);
         context.put("registryType", registryType);
-        context.put("repository", taskDefinition.getConfiguration().get("repository"));
         context.put("tag", taskDefinition.getConfiguration().get("tag"));
         context.put("scanLayers", taskDefinition.getConfiguration().get("scanLayers"));
         context.put("highVul", taskDefinition.getConfiguration().get("highVul"));
@@ -94,6 +137,13 @@ public class NeuVectorTaskConfigurator extends AbstractTaskConfigurator {
         }
         String enableStandaloneValue = taskDefinition.getConfiguration().get("enableStandalone");
         context.put("enableStandalone", Boolean.parseBoolean(enableStandaloneValue));
+        context.put("repository", prepareRepository(
+            taskDefinition.getConfiguration().get("customRegistryUsername"),
+            taskDefinition.getConfiguration().get("customRegistryPassword"),
+            taskDefinition.getConfiguration().get("repository"),
+            taskDefinition.getConfiguration().get("tag")
+        ));
+
 
         String storedVulnsToFail = taskDefinition.getConfiguration().get("vulnerabilitiesToFail");
         String storedVulnsToExempt = taskDefinition.getConfiguration().get("vulnerabilitiesToExempt");
