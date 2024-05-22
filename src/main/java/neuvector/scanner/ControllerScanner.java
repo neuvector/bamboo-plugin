@@ -66,7 +66,6 @@ public class ControllerScanner {
             } finally {
                 logout(httpclient);
             }
-            processResult.setSuccess(true);
             processResult.setsSanResultString(scanResultString);
 
         } catch (TaskException e) {

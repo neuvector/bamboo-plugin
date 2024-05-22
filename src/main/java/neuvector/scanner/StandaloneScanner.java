@@ -114,6 +114,24 @@ public class StandaloneScanner {
     }
 
     private CreateContainerResponse createContainer(DockerClient dockerClient) {
+        if (scanConfig.isSendReportToController() && !scanConfig.getControllerIP().isEmpty() && !scanConfig.getControllerPortString().isEmpty()) {
+            return dockerClient.createContainerCmd(scanConfig.getScannerImageRepository())
+                .withEnv(
+                    "CLUSTER_JOIN_ADDR=" + scanConfig.getControllerIP(),
+                    "CLUSTER_JOIN_PORT=" + scanConfig.getControllerPortString(),
+                    "SCANNER_CTRL_API_USERNAME=" + scanConfig.getNvUsername(),
+                    "SCANNER_CTRL_API_PASSWORD=" + scanConfig.getNvPassword(),
+                    "SCANNER_REGISTRY=" + scanConfig.getRegistryURL(),
+                    "SCANNER_REGISTRY_USERNAME=" + scanConfig.getRegistryUsername(),
+                    "SCANNER_REGISTRY_PASSWORD=" + scanConfig.getRegistryPassword(),
+                    "SCANNER_REPOSITORY=" + scanConfig.getRepository(),
+                    "SCANNER_TAG=" + scanConfig.getTag(),
+                    "SCANNER_SCAN_LAYERS=" + scanConfig.isScanLayers(),
+                    "SCANNER_ON_DEMAND=true"
+                )
+                .exec();
+        }
+
         return dockerClient.createContainerCmd(scanConfig.getScannerImageRepository())
             .withEnv(
                 "SCANNER_REGISTRY=" + scanConfig.getRegistryURL(),

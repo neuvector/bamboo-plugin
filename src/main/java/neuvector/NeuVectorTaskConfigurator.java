@@ -47,6 +47,9 @@ public class NeuVectorTaskConfigurator extends AbstractTaskConfigurator {
 
         boolean enableStandaloneValue = params.getBoolean("enableStandalone");
         config.put("enableStandalone", Boolean.toString(enableStandaloneValue));
+        
+        boolean sendReportToControllerValue = params.getBoolean("sendReportToController");
+        config.put("sendReportToController", Boolean.toString(sendReportToControllerValue));
 
         try {
             HttpServletRequest request = getServletRequest();
@@ -94,6 +97,8 @@ public class NeuVectorTaskConfigurator extends AbstractTaskConfigurator {
         }
         String enableStandaloneValue = taskDefinition.getConfiguration().get("enableStandalone");
         context.put("enableStandalone", Boolean.parseBoolean(enableStandaloneValue));
+        String sendReportToControllerValue = taskDefinition.getConfiguration().get("sendReportToController");
+        context.put("sendReportToController", Boolean.parseBoolean(sendReportToControllerValue));
 
         String storedVulnsToFail = taskDefinition.getConfiguration().get("vulnerabilitiesToFail");
         String storedVulnsToExempt = taskDefinition.getConfiguration().get("vulnerabilitiesToExempt");
