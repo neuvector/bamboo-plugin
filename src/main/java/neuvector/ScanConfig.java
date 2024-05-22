@@ -18,6 +18,7 @@ public class ScanConfig {
     private String tag;
     private boolean scanLayers;
     private boolean enableStandalone;
+    private boolean sendReportToController;
     private String highVul;
     private String mediumVul;
     private String controllerIP;
@@ -38,6 +39,8 @@ public class ScanConfig {
 
     public ScanConfig(final TaskContext taskContext, ProcessResult processResult) {
         enableStandalone = Boolean.valueOf((String)taskContext.getConfigurationMap().get("enableStandalone"));
+        sendReportToController = Boolean.valueOf((String)taskContext.getConfigurationMap().get("sendReportToController"));
+
         repository = (String)taskContext.getConfigurationMap().get("repository");
         scanLayers = Boolean.valueOf((String)taskContext.getConfigurationMap().get("scanLayers"));
         highVul = (String)taskContext.getConfigurationMap().get("highVul");
@@ -152,6 +155,14 @@ public class ScanConfig {
 
     public void setEnableStandalone(boolean enableStandalone) {
         this.enableStandalone = enableStandalone;
+    }
+
+    public boolean isSendReportToController() {
+        return sendReportToController;
+    }
+
+    public void setSendReportToController(boolean sendReportToController) {
+        this.sendReportToController = sendReportToController;
     }
 
     public String getHighVul() {

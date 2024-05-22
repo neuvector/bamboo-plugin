@@ -56,7 +56,13 @@ public class NeuVectorScannerTask implements TaskType {
         }
 
         if (processResult.getScanResultString() != null && processResult.getScanResultString().length() > 0) {
-            processScanReport(processResult);
+            try {
+                processScanReport(processResult);
+                processResult.setSuccess(true);
+            } catch (Exception e) {
+                buildLogger.addErrorLogEntry("Exception: " + e.getMessage());
+                processResult.setSuccess(false);
+            }
         }
 
         try {
@@ -97,7 +103,16 @@ public class NeuVectorScannerTask implements TaskType {
         }
 
         JsonObject reportObject = reportElement.getAsJsonObject();
-        JsonObject reportJson = reportObject.getAsJsonObject("report");
+
+        JsonObject reportJson;
+        if (reportObject.has("report") && !reportObject.get("report").isJsonNull()) {
+            reportJson = reportObject.getAsJsonObject("report");
+            processResult.setScanResultJson(reportObject);
+        } else {
+            JsonObject serverMessageJson = JsonParser.parseString(serverMessageFromScan).getAsJsonObject();
+            String causeMessage = "Scan failed. 'report' key is missing or null. Error Message: " + serverMessageJson.get("error_message").getAsString();
+            throw new TaskException(causeMessage);
+        }
         processResult.setScanResultJson(reportObject);
 
         JsonArray vulnerabilityArray = reportJson.getAsJsonArray("vulnerabilities");
@@ -241,7 +256,6 @@ public class NeuVectorScannerTask implements TaskType {
         if (numberExceed) {
             statementBuilder.append(" are present.");
             buildLogger.addErrorLogEntry("Build failed because " + statementBuilder.toString());
-            processResult.setSuccess(false);
         }
     }
 

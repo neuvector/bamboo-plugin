@@ -1,4 +1,5 @@
 [@ww.checkbox label="Enable Standalone" name="enableStandalone" toggle="true" required="false"/]
+[@ww.checkbox label="Send Reoport to container in Standalone mode" name="sendReportToController" toggle="true" required="false"/]
 [@ww.radio label="Choose registry type" name="registryType" listKey="key" listValue="value" toggle="true" list=registryMap /]
 [@ui.bambooSection dependsOn="registryType" showOn="custom"]
     [@ww.textfield label="Registry URL" name="customRegistryURL" required="false"/]
