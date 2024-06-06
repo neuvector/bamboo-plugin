@@ -254,6 +254,7 @@ public class NeuVectorScannerTask implements TaskType {
         }
 
         if (numberExceed) {
+            processResult.setSuccess(false);
             statementBuilder.append(" are present.");
             buildLogger.addErrorLogEntry("Build failed because " + statementBuilder.toString());
         }
