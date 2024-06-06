@@ -38,6 +38,8 @@ public class ScanConfig {
     private Set<String> vulWhiteListSet;
 
     public ScanConfig(final TaskContext taskContext, ProcessResult processResult) {
+        ScanResult scanResult = processResult.getScanResult();
+
         enableStandalone = Boolean.valueOf((String)taskContext.getConfigurationMap().get("enableStandalone"));
         sendReportToController = Boolean.valueOf((String)taskContext.getConfigurationMap().get("sendReportToController"));
 
@@ -58,8 +60,8 @@ public class ScanConfig {
             registryPassword = AdminConfigUtil.getAdminConfig("registryPassword");
         }
         
-        ScanResult scanResult = processResult.getScanResult();
 
+        scanResult.setRegistry(registryURL);
         scanResult.setRepository(repository);
         scanResult.setTag(tag);
 
